@@ -1,0 +1,102 @@
+.tree-table-container {
+  padding: 20px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.toolbar {
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
+.mode-text {
+  margin-right: 12px;
+  font-weight: 500;
+  color: #3366cc;
+}
+
+.toolbar button {
+  margin-right: 10px;
+  padding: 6px 12px;
+  font-size: 14px;
+  background-color: #f0f0f0;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.toolbar button:hover:not(:disabled) {
+  background-color: #e0e0e0;
+}
+
+.toolbar button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.action-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  font-size: 14px;
+  font-weight: bold;
+  color: white !important;
+  margin-right: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  vertical-align: middle;
+}
+
+.action-btn.add-btn {
+  background-color: #007bff !important;
+}
+
+.action-btn.delete-btn {
+  background-color: #dc3545 !important;
+}
+
+.action-btn:hover {
+  opacity: 0.8 !important;
+}
+
+.item-label {
+  font-weight: 400;
+}
+
+.group-label {
+  font-weight: bold;
+}
+
+.border-right {
+  border-right: 1px solid #ddd !important;
+}
+
+.expand-icon {
+  cursor: pointer;
+  margin-right: 4px;
+  user-select: none;
+}
+
+.ag-cell {
+  border-right: none !important;
+}
+
+.ag-header-cell {
+  border-right: 1px solid #ddd !important;
+}
+
+.ag-header-cell:last-child {
+  border-right: none !important;
+}
+
+
+.ag-cell:last-child,
+.ag-header-cell:last-child {
+  border-right: none;
+}
