@@ -14,7 +14,7 @@
       :animateRows="true"
       :suppressRowClickSelection="true"
       @cellClicked="onCellClicked"
-      :key="isEditMode"
+      :key="isEditMode.toString()"
     />
   </div>
 </template>
@@ -26,67 +26,39 @@ import { AgGridVue } from 'ag-grid-vue3';
 import { ModuleRegistry, AllCommunityModule } from 'ag-grid-community';
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+import { TreeStore } from '../stores/TreeStore';
+import { TreeItem } from '../types';
 
 ModuleRegistry.registerModules([AllCommunityModule]);
-
-interface TreeNode {
-  id: number | string;
-  label: string;
-  parent: number | string | null;
-  children?: TreeNode[];
-  expanded?: boolean;
-}
 
 export default defineComponent({
   name: 'TreeTable',
   components: { AgGridVue },
   setup() {
-    const treeData = ref<TreeNode[]>([
-      {
-        id: 1,
-        label: 'Айтем 1',
-        parent: null,
-        expanded: true,
-        children: [
-          {
-            id: 2,
-            label: 'Айтем 2',
-            parent: 1,
-            expanded: true,
-            children: [
-              {
-                id: 4,
-                label: 'Айтем 4',
-                parent: 2,
-                expanded: true,
-                children: [
-                  { id: 7, label: 'Айтем 7', parent: 4 },
-                  { id: 8, label: 'Айтем 8', parent: 4 }
-                ]
-              },
-              { id: 5, label: 'Айтем 5', parent: 2 },
-              { id: 6, label: 'Айтем 6', parent: 2 }
-            ]
-          },
-          { id: 3, label: 'Айтем 3', parent: 1 }
-        ]
-      }
-    ]);
+    const initialData: TreeItem[] = [
+      { id: 1, label: 'Айтем 1', parent: null, expanded: true },
+      { id: 2, label: 'Айтем 2', parent: 1, expanded: true },
+      { id: 3, label: 'Айтем 3', parent: 1, expanded: false },
+      { id: 4, label: 'Айтем 4', parent: 2, expanded: true },
+      { id: 5, label: 'Айтем 5', parent: 2, expanded: false },
+      { id: 6, label: 'Айтем 6', parent: 2, expanded: false },
+      { id: 7, label: 'Айтем 7', parent: 4, expanded: false },
+      { id: 8, label: 'Айтем 8', parent: 4, expanded: false }
+    ];
 
+    const treeStore = new TreeStore(initialData);
     const isEditMode = ref(false);
-    const history = ref<TreeNode[][]>([JSON.parse(JSON.stringify(treeData.value))]);
+    const history = ref<TreeItem[][]>([treeStore.getSnapshot()]);
     const historyIndex = ref(0);
+    const refreshKey = ref(0); 
 
     const saveHistory = () => {
-      // Сохраняем текущее состояние ПЕРЕД изменением
-      const currentSnapshot = JSON.parse(JSON.stringify(treeData.value));
+      const currentSnapshot = treeStore.getSnapshot();
       
-      // Если мы не в конце истории, обрезаем все после текущей позиции
       if (historyIndex.value < history.value.length - 1) {
         history.value = history.value.slice(0, historyIndex.value + 1);
       }
       
-      // Добавляем новый снимок только если он отличается от текущего
       const lastSnapshot = history.value[history.value.length - 1];
       if (JSON.stringify(currentSnapshot) !== JSON.stringify(lastSnapshot)) {
         history.value.push(currentSnapshot);
@@ -97,42 +69,54 @@ export default defineComponent({
     const undo = () => {
       if (historyIndex.value > 0) {
         historyIndex.value--;
-        treeData.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
+        treeStore.restoreFromSnapshot(history.value[historyIndex.value]);
+        refreshKey.value++;
       }
     };
 
     const redo = () => {
       if (historyIndex.value < history.value.length - 1) {
         historyIndex.value++;
-        treeData.value = JSON.parse(JSON.stringify(history.value[historyIndex.value]));
+        treeStore.restoreFromSnapshot(history.value[historyIndex.value]);
+        refreshKey.value++;
       }
     };
 
-    const flattenTree = (nodes: TreeNode[], level = 0): any[] => {
+    const flattenTree = (items: TreeItem[], level = 0): any[] => {
       const result: any[] = [];
-      nodes.forEach(node => {
-        const hasChildren = node.children && node.children.length > 0;
+      
+      const rootItems = level === 0 
+        ? items.filter(item => item.parent === null)
+        : items;
+
+      rootItems.forEach(item => {
+        const children = treeStore.getChildren(item.id);
+        const hasChildren = children.length > 0;
+        
         result.push({
-          id: node.id,
-          label: node.label,
+          id: item.id,
+          label: item.label,
           level,
           hasChildren,
-          expanded: node.expanded,
+          expanded: item.expanded,
           category: hasChildren ? 'Группа' : 'Элемент'
         });
-        if (node.expanded && node.children) {
-          result.push(...flattenTree(node.children, level + 1));
+
+        if (item.expanded && hasChildren) {
+          result.push(...flattenTree(children, level + 1));
         }
       });
+      
       return result;
     };
 
-    const flattenedData = computed(() =>
-      flattenTree(treeData.value).map((item, index) => ({
+    const flattenedData = computed(() => {
+      refreshKey.value;
+      return flattenTree(treeStore.getAll()).map((item, index) => ({
         ...item,
         rowNumber: index + 1
-      }))
-    );
+      }));
+    });
 
     const columnDefs = computed(() => [
       {
@@ -177,81 +161,58 @@ export default defineComponent({
     ]);
 
     const toggleNode = (id: number | string) => {
-      const toggleRecursive = (nodes: TreeNode[]) => {
-        for (const node of nodes) {
-          if (node.id === id) {
-            node.expanded = !node.expanded;
-            return true;
-          }
-          if (node.children && toggleRecursive(node.children)) {
-            return true;
-          }
-        }
-        return false;
-      };
-      toggleRecursive(treeData.value);
-    };
-
-    const findNodeById = (nodes: TreeNode[], id: number | string): TreeNode | null => {
-      for (const node of nodes) {
-        if (node.id === id) return node;
-        if (node.children) {
-          const found = findNodeById(node.children, id);
-          if (found) return found;
-        }
-      }
-      return null;
+      treeStore.toggleExpanded(id);
+      refreshKey.value++;
     };
 
     const addChild = (parentId: number | string) => {
       saveHistory();
-      const parentNode = findNodeById(treeData.value, parentId);
-      if (parentNode) {
-        if (!parentNode.children) parentNode.children = [];
-        parentNode.children.push({
-          id: Date.now(),
-          label: 'Новый элемент',
-          parent: parentNode.id
-        });
-        parentNode.expanded = true;
-        
-        // Сохраняем новое состояние после изменения
-        const newSnapshot = JSON.parse(JSON.stringify(treeData.value));
-        history.value.push(newSnapshot);
-        historyIndex.value = history.value.length - 1;
+      
+      const newItem: TreeItem = {
+        id: Date.now(),
+        label: 'Новый элемент',
+        parent: parentId,
+        expanded: false
+      };
+      
+      treeStore.addItem(newItem);
+      
+      const parent = treeStore.getItem(parentId);
+      if (parent && !parent.expanded) {
+        treeStore.toggleExpanded(parentId);
       }
+      
+      const newSnapshot = treeStore.getSnapshot();
+      history.value.push(newSnapshot);
+      historyIndex.value = history.value.length - 1;
+      
+      refreshKey.value++;
     };
 
     const removeNode = (id: number | string) => {
       saveHistory();
-      const removeRecursive = (nodes: TreeNode[]): TreeNode[] => {
-        return nodes
-          .filter(node => node.id !== id)
-          .map(node => ({
-            ...node,
-            children: node.children ? removeRecursive(node.children) : []
-          }));
-      };
-      treeData.value = removeRecursive(treeData.value);
-      
-      // Сохраняем новое состояние после изменения
-      const newSnapshot = JSON.parse(JSON.stringify(treeData.value));
+      treeStore.removeItem(id);
+      const newSnapshot = treeStore.getSnapshot();
       history.value.push(newSnapshot);
       historyIndex.value = history.value.length - 1;
+      
+      refreshKey.value++;
     };
 
     const editNodeLabel = (id: number | string, currentLabel: string) => {
       const newLabel = prompt('Введите новое название:', currentLabel);
       if (newLabel !== null && newLabel !== currentLabel) {
         saveHistory();
-        const node = findNodeById(treeData.value, id);
-        if (node) {
-          node.label = newLabel;
-          
-          // Сохраняем новое состояние после изменения
-          const newSnapshot = JSON.parse(JSON.stringify(treeData.value));
+        
+        const item = treeStore.getItem(id);
+        if (item) {
+          const updatedItem = { ...item, label: newLabel };
+          treeStore.updateItem(updatedItem);
+          const newSnapshot = treeStore.getSnapshot();
           history.value.push(newSnapshot);
           historyIndex.value = history.value.length - 1;
+          
+          refreshKey.value++;
         }
       }
     };

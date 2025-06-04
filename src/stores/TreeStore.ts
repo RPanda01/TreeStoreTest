@@ -35,25 +35,25 @@ export class TreeStore {
   }
 
   getAllParents(id: string | number): TreeItem[] {
-  const result: TreeItem[] = [];
-  let current = this.getItem(id);
-  
-  if (current) {
-    result.push(current);
-  }
-  
-  while (current && current.parent !== null) {
-    const parent = this.getItem(current.parent);
-    if (parent) {
-      result.push(parent);
-      current = parent;
-    } else {
-      break;
+    const result: TreeItem[] = [];
+    let current = this.getItem(id);
+    
+    if (current) {
+      result.push(current);
     }
+    
+    while (current && current.parent !== null) {
+      const parent = this.getItem(current.parent);
+      if (parent) {
+        result.push(parent);
+        current = parent;
+      } else {
+        break;
+      }
+    }
+    
+    return result;
   }
-  
-  return result;
-}
 
   addItem(item: TreeItem) {
     this.items.push(item);
@@ -72,5 +72,39 @@ export class TreeStore {
       this.items[index] = updatedItem;
       this.itemMap.set(updatedItem.id, updatedItem);
     }
+  }
+
+  buildTree(): TreeItem[] {
+    const rootItems = this.items.filter(item => item.parent === null);
+    
+    const buildChildren = (parentId: string | number): TreeItem[] => {
+      return this.getChildren(parentId).map(child => ({
+        ...child,
+        children: buildChildren(child.id)
+      }));
+    };
+
+    return rootItems.map(root => ({
+      ...root,
+      children: buildChildren(root.id)
+    }));
+  }
+
+  toggleExpanded(id: string | number) {
+    const item = this.getItem(id);
+    if (item) {
+      const updatedItem = { ...item, expanded: !item.expanded };
+      this.updateItem(updatedItem);
+    }
+  }
+
+  getSnapshot(): TreeItem[] {
+    return JSON.parse(JSON.stringify(this.items));
+  }
+
+  restoreFromSnapshot(snapshot: TreeItem[]) {
+    this.items = JSON.parse(JSON.stringify(snapshot));
+    this.itemMap.clear();
+    this.items.forEach(item => this.itemMap.set(item.id, item));
   }
 }
